@@ -1,4 +1,5 @@
 package aventuras;
+
 import java.awt.FileDialog;
 import java.awt.Frame;
 import java.io.FileOutputStream;
@@ -10,6 +11,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import com.itextpdf.io.font.constants.StandardFonts;
 import com.itextpdf.kernel.font.PdfFont;
@@ -24,412 +27,378 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 
 public class Modelo {
-	// ÚNICO usuario de conexión técnica a MySQL con sus 4 permisos
-	private final String url = "jdbc:mysql://localhost:3306/AventurasDB";
-	private final String user = "admin";
-	private final String password = "1234";
+    private final String url = "jdbc:mysql://localhost:3306/AventurasDB";
+    private final String user = "admin";
+    private final String password = "1234";
 
-	private Connection getConexion() throws SQLException {
-		return DriverManager.getConnection(url, user, password);
-	}
+    private final DateTimeFormatter euroFormato = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private final DateTimeFormatter mysqlFormato = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-	// --- COMPROBACIÓN DE LOGIN CONTRA LA TABLA DE LA BD ---
-	public String validarLogin(String usuario, String clave) {
-		String sql = "SELECT TipoUsuario FROM Usuarios WHERE NombreUsuario = ? AND ClaveEncriptadaUsuario = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setString(1, usuario);
-			ps.setString(2, clave);
-			try (ResultSet rs = ps.executeQuery()) {
-				if (rs.next()) {
-					// Devuelve el rol de la tabla: 'administrador' o 'basico'
-					return rs.getString("TipoUsuario"); 
-				}
-			}
-		} catch (SQLException e) { 
-			System.out.println("Error Login DB: " + e.getMessage()); 
-		}
-		return null; // Si las credenciales no existen en la tabla, devuelve null
-	}
+    private Connection getConexion() throws SQLException {
+        return DriverManager.getConnection(url, user, password);
+    }
 
-	// =========================================================================
-	// --- CONSULTAS GENERALES ---
-	// =========================================================================
-	public ArrayList<String> consultarMonitores() {
-		ArrayList<String> lista = new ArrayList<>();
-		String sql = "SELECT idMonitor, NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor FROM Monitores";
-		try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-			while (rs.next()) {
-				// Reducimos los márgenes de 12, 15 y 20 a espacios más ajustados (8, 10, 15)
-				lista.add(String.format("%-2d | %-10s | %-12s | %-16s | %5.2f€", 
-						rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getDouble(5)));
-			}
-		} catch (SQLException e) { lista.add("Error al consultar."); }
-		return lista;
-	}
+    // --- MÉTODOS DE CONVERSIÓN DE FORMATO DE FECHA (MVC ESTRICTO) ---
+    private String deEuroAMySQL(String fechaEuro) {
+        try {
+            return LocalDate.parse(fechaEuro.trim(), euroFormato).format(mysqlFormato);
+        } catch (Exception e) {
+            return null; // Devuelve null si el usuario introduce un formato incorrecto
+        }
+    }
 
-	public ArrayList<String> consultarAventureros() {
-		ArrayList<String> lista = new ArrayList<>();
-		String sql = "SELECT idAventurero, NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero FROM Aventureros";
-		try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-			while (rs.next()) {
-				lista.add(String.format("%-2d | %-10s | %-12s | %-16s | %-9s", 
-						rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)));
-			}
-		} catch (SQLException e) { lista.add("Error al consultar."); }
-		return lista;
-	}
+    private String deMySQLAEuro(String fechaMySQL) {
+        try {
+            if (fechaMySQL == null) return "";
+            return LocalDate.parse(fechaMySQL.trim(), mysqlFormato).format(euroFormato);
+        } catch (Exception e) {
+            return "";
+        }
+    }
 
-	public ArrayList<String> consultarActividades() {
-		ArrayList<String> lista = new ArrayList<>();
-		String sql = "SELECT a.idActividad, a.NombreActividad, a.PrecioActividad, a.DuracionActividad, m.NombreMonitor " +
-				"FROM Actividades a LEFT JOIN Monitores m ON a.idMonitorFK = m.idMonitor";
-		try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-			while (rs.next()) {
-				lista.add(String.format("%-2d | %-14s | %5.2f€ | %3.1fh | M: %s", 
-						rs.getInt(1), rs.getString(2), rs.getDouble(3), rs.getDouble(4), rs.getString(5)));
-			}
-		} catch (SQLException e) { lista.add("Error al consultar."); }
-		return lista;
-	}
+    public String validarLogin(String usuario, String clave) {
+        String sql = "SELECT TipoUsuario FROM Usuarios WHERE NombreUsuario = ? AND ClaveEncriptadaUsuario = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, usuario);
+            ps.setString(2, clave);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getString("TipoUsuario"); 
+            }
+        } catch (SQLException e) { 
+            System.out.println("Error Login DB: " + e.getMessage()); 
+        }
+        return null;
+    }
 
-	public ArrayList<String> consultarParticipaciones() {
-		ArrayList<String> lista = new ArrayList<>();
-		String sql = "SELECT p.idAventureroFK, p.idActividadFK, av.NombreAventurero, ac.NombreActividad, p.HoraActividad " +
-				"FROM Participan p JOIN Aventureros av ON p.idAventureroFK = av.idAventurero " +
-				"JOIN Actividades ac ON p.idActividadFK = ac.idActividad";
-		try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-			while (rs.next()) {
-				lista.add(String.format("%d-%d | Ave: %-10s | Act: %-10s | Hor: %s", 
-						rs.getInt(1), rs.getInt(2), rs.getString(3), rs.getString(4), rs.getString(5)));
-			}
-		} catch (SQLException e) { lista.add("Error al consultar."); }
-		return lista;
-	}
+    // --- CONSULTAS GENERALES CON FECHA ---
+    public ArrayList<String> consultarMonitores() {
+        ArrayList<String> lista = new ArrayList<>();
+        String sql = "SELECT idMonitor, NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, fecha_ingreso FROM Monitores";
+        try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                String fechaEuro = deMySQLAEuro(rs.getString(6));
+                lista.add(String.format("%-2d | %-10s | %-12s | %-16s | %5.2f€ | %s", 
+                        rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getDouble(5), fechaEuro));
+            }
+        } catch (SQLException e) { lista.add("Error al consultar."); }
+        return lista;
+    }
 
-	// =========================================================================
-	// --- ALTAS ---
-	// =========================================================================
-	public boolean altaMonitor(String nom, String ape, String em, double sal) {
-		String sql = "INSERT INTO Monitores (NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor) VALUES (?, ?, ?, ?)";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setDouble(4, sal);
-			return ps.executeUpdate() > 0;
-		} catch (SQLException e) { return false; }
-	}
+    public ArrayList<String> consultarAventureros() {
+        ArrayList<String> lista = new ArrayList<>();
+        String sql = "SELECT idAventurero, NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, fecha_nacimiento FROM Aventureros";
+        try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                String fechaEuro = deMySQLAEuro(rs.getString(6));
+                lista.add(String.format("%-2d | %-10s | %-12s | %-16s | %-9s | %s", 
+                        rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), fechaEuro));
+            }
+        } catch (SQLException e) { lista.add("Error al consultar."); }
+        return lista;
+    }
 
-	public boolean altaAventurero(String nom, String ape, String em, String tel) {
-		String sql = "INSERT INTO Aventureros (NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero) VALUES (?, ?, ?, ?)";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setString(4, tel);
-			return ps.executeUpdate() > 0;
-		} catch (SQLException e) { return false; }
-	}
+    public ArrayList<String> consultarActividades() {
+        ArrayList<String> lista = new ArrayList<>();
+        String sql = "SELECT a.idActividad, a.NombreActividad, a.PrecioActividad, a.DuracionActividad, m.NombreMonitor, a.fecha_actividad " +
+                "FROM Actividades a LEFT JOIN Monitores m ON a.idMonitorFK = m.idMonitor";
+        try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                String fechaEuro = deMySQLAEuro(rs.getString(6));
+                lista.add(String.format("%-2d | %-14s | %5.2f€ | %3.1fh | M: %-10s | %s", 
+                        rs.getInt(1), rs.getString(2), rs.getDouble(3), rs.getDouble(4), rs.getString(5), fechaEuro));
+            }
+        } catch (SQLException e) { lista.add("Error al consultar."); }
+        return lista;
+    }
 
-	public boolean altaActividad(String nom, double pre, double dur, int idMon) {
-		String sql = "INSERT INTO Actividades (NombreActividad, PrecioActividad, DuracionActividad, idMonitorFK) VALUES (?, ?, ?, ?)";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setString(1, nom); ps.setDouble(2, pre); ps.setDouble(3, dur); ps.setInt(4, idMon);
-			return ps.executeUpdate() > 0;
-		} catch (SQLException e) { return false; }
-	}
+    public ArrayList<String> consultarParticipaciones() {
+        ArrayList<String> lista = new ArrayList<>();
+        String sql = "SELECT p.idAventureroFK, p.idActividadFK, av.NombreAventurero, ac.NombreActividad, p.HoraActividad, p.fecha_inscripcion " +
+                "FROM Participan p JOIN Aventureros av ON p.idAventureroFK = av.idAventurero " +
+                "JOIN Actividades ac ON p.idActividadFK = ac.idActividad";
+        try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                String fechaEuro = deMySQLAEuro(rs.getString(6));
+                lista.add(String.format("%d-%d | Ave: %-10s | Act: %-10s | Hor: %-5s | %s", 
+                        rs.getInt(1), rs.getInt(2), rs.getString(3), rs.getString(4), rs.getString(5), fechaEuro));
+            }
+        } catch (SQLException e) { lista.add("Error al consultar."); }
+        return lista;
+    }
 
-	public boolean altaParticipacion(int idAve, int idAct, String hora) {
-		String sql = "INSERT INTO Participan (idAventureroFK, idActividadFK, HoraActividad) VALUES (?, ?, ?)";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, idAve); ps.setInt(2, idAct); ps.setString(3, hora);
-			return ps.executeUpdate() > 0;
-		} catch (SQLException e) { return false; }
-	}
+    // --- ALTAS CON PARSEO DE FECHA ---
+    public boolean altaMonitor(String nom, String ape, String em, double sal, String fechaEuro) {
+        String fechaMySQL = deEuroAMySQL(fechaEuro);
+        if (fechaMySQL == null) return false; // Error de formato de fecha
+        String sql = "INSERT INTO Monitores (NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, fecha_ingreso) VALUES (?, ?, ?, ?, ?)";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setDouble(4, sal); ps.setString(5, fechaMySQL);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
 
-	// =========================================================================
-	// --- BAJAS ---
-	// =========================================================================
-	public boolean bajaMonitor(int id) {
-		String sql = "DELETE FROM Monitores WHERE idMonitor = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, id); return ps.executeUpdate() > 0; }
-		catch (SQLException e) { return false; }
-	}
+    public boolean altaAventurero(String nom, String ape, String em, String tel, String fechaEuro) {
+        String fechaMySQL = deEuroAMySQL(fechaEuro);
+        if (fechaMySQL == null) return false;
+        String sql = "INSERT INTO Aventureros (NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, fecha_nacimiento) VALUES (?, ?, ?, ?, ?)";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setString(4, tel); ps.setString(5, fechaMySQL);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
 
-	public boolean bajaAventurero(int id) {
-		String sql = "DELETE FROM Aventureros WHERE idAventurero = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, id); return ps.executeUpdate() > 0; }
-		catch (SQLException e) { return false; }
-	}
+    public boolean altaActividad(String nom, double pre, double dur, int idMon, String fechaEuro) {
+        String fechaMySQL = deEuroAMySQL(fechaEuro);
+        if (fechaMySQL == null) return false;
+        String sql = "INSERT INTO Actividades (NombreActividad, PrecioActividad, DuracionActividad, idMonitorFK, fecha_actividad) VALUES (?, ?, ?, ?, ?)";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nom); ps.setDouble(2, pre); ps.setDouble(3, dur); ps.setInt(4, idMon); ps.setString(5, fechaMySQL);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
 
-	public boolean bajaActividad(int id) {
-		String sql = "DELETE FROM Actividades WHERE idActividad = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, id); return ps.executeUpdate() > 0; }
-		catch (SQLException e) { return false; }
-	}
+    public boolean altaParticipacion(int idAve, int idAct, String hora, String fechaEuro) {
+        String fechaMySQL = deEuroAMySQL(fechaEuro);
+        if (fechaMySQL == null) return false;
+        String sql = "INSERT INTO Participan (idAventureroFK, idActividadFK, HoraActividad, fecha_inscripcion) VALUES (?, ?, ?, ?)";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idAve); ps.setInt(2, idAct); ps.setString(3, hora); ps.setString(4, fechaMySQL);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
 
-	public boolean bajaParticipacion(int idAve, int idAct) {
-		String sql = "DELETE FROM Participan WHERE idAventureroFK = ? AND idActividadFK = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, idAve); ps.setInt(2, idAct); return ps.executeUpdate() > 0; }
-		catch (SQLException e) { return false; }
-	}
+    // --- BAJAS (Permanecen igual) ---
+    public boolean bajaMonitor(int id) {
+        String sql = "DELETE FROM Monitores WHERE idMonitor = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, id); return ps.executeUpdate() > 0; }
+        catch (SQLException e) { return false; }
+    }
 
-	// =========================================================================
-	// --- MODIFICACIONES ---
-	// =========================================================================
-	public boolean modificarMonitor(int id, String nom, String ape, String em, double sal) {
-		String sql = "UPDATE Monitores SET NombreMonitor = ?, ApellidoMonitor = ?, EmailMonitor = ?, SalarioMonitor = ? WHERE idMonitor = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setDouble(4, sal); ps.setInt(5, id);
-			return ps.executeUpdate() > 0;
-		} catch (SQLException e) { return false; }
-	}
+    public boolean bajaAventurero(int id) {
+        String sql = "DELETE FROM Aventureros WHERE idAventurero = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, id); return ps.executeUpdate() > 0; }
+        catch (SQLException e) { return false; }
+    }
 
-	public boolean modificarAventurero(int id, String nom, String ape, String em, String tel) {
-		String sql = "UPDATE Aventureros SET NombreAventurero = ?, ApellidoAventurero = ?, EmailAventurero = ?, TelefonoAventurero = ? WHERE idAventurero = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setString(4, tel); ps.setInt(5, id);
-			return ps.executeUpdate() > 0;
-		} catch (SQLException e) { return false; }
-	}
+    public boolean bajaActividad(int id) {
+        String sql = "DELETE FROM Actividades WHERE idActividad = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, id); return ps.executeUpdate() > 0; }
+        catch (SQLException e) { return false; }
+    }
 
-	public boolean modificarActividad(int id, String nom, double pre, double dur, int idMon) {
-		String sql = "UPDATE Actividades SET NombreActividad = ?, PrecioActividad = ?, DuracionActividad = ?, idMonitorFK = ? WHERE idActividad = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setString(1, nom); ps.setDouble(2, pre); ps.setDouble(3, dur); ps.setInt(4, idMon); ps.setInt(5, id);
-			return ps.executeUpdate() > 0;
-		} catch (SQLException e) { return false; }
-	}
+    public boolean bajaParticipacion(int idAve, int idAct) {
+        String sql = "DELETE FROM Participan WHERE idAventureroFK = ? AND idActividadFK = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, idAve); ps.setInt(2, idAct); return ps.executeUpdate() > 0; }
+        catch (SQLException e) { return false; }
+    }
 
-	public boolean modificarParticipacion(int idAveViejo, int idActViejo, int idAveNuevo, int idActNuevo, String hora) {
-		if (bajaParticipacion(idAveViejo, idActViejo)) { return altaParticipacion(idAveNuevo, idActNuevo, hora); }
-		return false;
-	}
+    // --- MODIFICACIONES CON PARSEO DE FECHA ---
+    public boolean modificarMonitor(int id, String nom, String ape, String em, double sal, String fechaEuro) {
+        String fechaMySQL = deEuroAMySQL(fechaEuro);
+        if (fechaMySQL == null) return false;
+        String sql = "UPDATE Monitores SET NombreMonitor = ?, ApellidoMonitor = ?, EmailMonitor = ?, SalarioMonitor = ?, fecha_ingreso = ? WHERE idMonitor = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setDouble(4, sal); ps.setString(5, fechaMySQL); ps.setInt(6, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
 
-	// =========================================================================
-	// --- BÚSQUEDAS UNITARIAS ---
-	// =========================================================================
-	public String[] buscarMonitorPorId(int id) {
-		String sql = "SELECT NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor FROM Monitores WHERE idMonitor = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, id);
-			try (ResultSet rs = ps.executeQuery()) {
-				if (rs.next()) return new String[]{ rs.getString(1), rs.getString(2), rs.getString(3), String.valueOf(rs.getDouble(4)) };
-			}
-		} catch (SQLException e) { }
-		return null;
-	}
+    public boolean modificarAventurero(int id, String nom, String ape, String em, String tel, String fechaEuro) {
+        String fechaMySQL = deEuroAMySQL(fechaEuro);
+        if (fechaMySQL == null) return false;
+        String sql = "UPDATE Aventureros SET NombreAventurero = ?, ApellidoAventurero = ?, EmailAventurero = ?, TelefonoAventurero = ?, fecha_nacimiento = ? WHERE idAventurero = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setString(4, tel); ps.setString(5, fechaMySQL); ps.setInt(6, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
 
-	public String[] buscarAventureroPorId(int id) {
-		String sql = "SELECT NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero FROM Aventureros WHERE idAventurero = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, id);
-			try (ResultSet rs = ps.executeQuery()) {
-				if (rs.next()) return new String[]{ rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4) };
-			}
-		} catch (SQLException e) { }
-		return null;
-	}
+    public boolean modificarActividad(int id, String nom, double pre, double dur, int idMon, String fechaEuro) {
+        String fechaMySQL = deEuroAMySQL(fechaEuro);
+        if (fechaMySQL == null) return false;
+        String sql = "UPDATE Actividades SET NombreActividad = ?, PrecioActividad = ?, DuracionActividad = ?, idMonitorFK = ?, fecha_actividad = ? WHERE idActividad = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nom); ps.setDouble(2, pre); ps.setDouble(3, dur); ps.setInt(4, idMon); ps.setString(5, fechaMySQL); ps.setInt(6, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
 
-	public String[] buscarActividadPorId(int id) {
-		String sql = "SELECT NombreActividad, PrecioActividad, DuracionActividad, idMonitorFK FROM Actividades WHERE idActividad = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, id);
-			try (ResultSet rs = ps.executeQuery()) {
-				if (rs.next()) return new String[]{ rs.getString(1), String.valueOf(rs.getDouble(2)), String.valueOf(rs.getDouble(3)), String.valueOf(rs.getInt(4)) };
-			}
-		} catch (SQLException e) { }
-		return null;
-	}
+    public boolean modificarParticipacion(int idAveViejo, int idActViejo, int idAveNuevo, int idActNuevo, String hora, String fechaEuro) {
+        if (bajaParticipacion(idAveViejo, idActViejo)) { return altaParticipacion(idAveNuevo, idActNuevo, hora, fechaEuro); }
+        return false;
+    }
 
-	public String buscarHoraParticipacion(int idAve, int idAct) {
-		String sql = "SELECT HoraActividad FROM Participan WHERE idAventureroFK = ? AND idActividadFK = ?";
-		try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, idAve); ps.setInt(2, idAct);
-			try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return rs.getString(1); }
-		} catch (SQLException e) { }
-		return "";
-	}
+    // --- BÚSQUEDAS UNITARIAS (Devuelven la fecha ya convertida a Euro) ---
+    public String[] buscarMonitorPorId(int id) {
+        String sql = "SELECT NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, fecha_ingreso FROM Monitores WHERE idMonitor = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return new String[]{ rs.getString(1), rs.getString(2), rs.getString(3), String.valueOf(rs.getDouble(4)), deMySQLAEuro(rs.getString(5)) };
+            }
+        } catch (SQLException e) { }
+        return null;
+    }
 
-	// =========================================================================
-	// --- CHOICES ---
-	// =========================================================================
-	public ArrayList<String> obtenerMonitores() {
-		ArrayList<String> res = new ArrayList<>();
-		String sql = "SELECT idMonitor, NombreMonitor, ApellidoMonitor FROM Monitores";
-		try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-			while (rs.next()) res.add(rs.getInt(1) + " - " + rs.getString(2) + " " + rs.getString(3));
-		} catch (SQLException e) { }
-		return res;
-	}
+    public String[] buscarAventureroPorId(int id) {
+        String sql = "SELECT NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, fecha_nacimiento FROM Aventureros WHERE idAventurero = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return new String[]{ rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), deMySQLAEuro(rs.getString(5)) };
+            }
+        } catch (SQLException e) { }
+        return null;
+    }
 
-	public ArrayList<String> obtenerAventureros() {
-		ArrayList<String> res = new ArrayList<>();
-		String sql = "SELECT idAventurero, NombreAventurero, ApellidoAventurero FROM Aventureros";
-		try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-			while (rs.next()) res.add(rs.getInt(1) + " - " + rs.getString(2) + " " + rs.getString(3));
-		} catch (SQLException e) { }
-		return res;
-	}
+    public String[] buscarActividadPorId(int id) {
+        String sql = "SELECT NombreActividad, PrecioActividad, DuracionActividad, idMonitorFK, fecha_actividad FROM Actividades WHERE idActividad = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return new String[]{ rs.getString(1), String.valueOf(rs.getDouble(2)), String.valueOf(rs.getDouble(3)), String.valueOf(rs.getInt(4)), deMySQLAEuro(rs.getString(5)) };
+            }
+        } catch (SQLException e) { }
+        return null;
+    }
 
-	public ArrayList<String> obtenerActividades() {
-		ArrayList<String> res = new ArrayList<>();
-		String sql = "SELECT idActividad, NombreActividad FROM Actividades";
-		try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-			while (rs.next()) res.add(rs.getInt(1) + " - " + rs.getString(2));
-		} catch (SQLException e) { }
-		return res;
-	}
+    public String buscarHoraYFechaParticipacion(int idAve, int idAct) {
+        String sql = "SELECT HoraActividad, fecha_inscripcion FROM Participan WHERE idAventureroFK = ? AND idActividadFK = ?";
+        try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idAve); ps.setInt(2, idAct);
+            try (ResultSet rs = ps.executeQuery()) { 
+                if (rs.next()) return rs.getString(1) + "|" + deMySQLAEuro(rs.getString(2)); 
+            }
+        } catch (SQLException e) { }
+        return "|";
+    }
 
-	public ArrayList<String> obtenerParticipaciones() {
-		ArrayList<String> res = new ArrayList<>();
-		String sql = "SELECT p.idAventureroFK, p.idActividadFK, av.NombreAventurero, ac.NombreActividad FROM Participan p " +
-				"JOIN Aventureros av ON p.idAventureroFK = av.idAventurero JOIN Actividades ac ON p.idActividadFK = ac.idActividad";
-		try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-			while (rs.next()) res.add(rs.getInt(1) + "-" + rs.getInt(2) + " | " + rs.getString(3) + " en " + rs.getString(4));
-		} catch (SQLException e) { }
-		return res;
-	}
-	
-	
-	/**
-	 * Exporta el contenido de un TextArea a un PDF. Abre un diálogo para seleccionar la ruta.
-	 *
-	 * @param txtaConsulta TextArea con el contenido a exportar
-	 * @return true si el PDF se ha generado correctamente, false en caso de error o cancelación
-	 */
-	public boolean exportToPDF(java.awt.List lstConsulta) {
-	    if (lstConsulta == null || lstConsulta.getItemCount() == 0) {
-	        return false;
-	    }
+    // --- CHOICES (Siguen igual) ---
+    public ArrayList<String> obtenerMonitores() {
+        ArrayList<String> res = new ArrayList<>();
+        String sql = "SELECT idMonitor, NombreMonitor, ApellidoMonitor FROM Monitores";
+        try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) res.add(rs.getInt(1) + " - " + rs.getString(2) + " " + rs.getString(3));
+        } catch (SQLException e) { }
+        return res;
+    }
 
-	    String[] lines = lstConsulta.getItems();
-	    
-	    int firstDataIndex = 0;
-	    while (firstDataIndex < lines.length && lines[firstDataIndex].trim().isEmpty()) {
-	        firstDataIndex++;
-	    }
-	    if (firstDataIndex >= lines.length) {
-	        return false;
-	    }
+    public ArrayList<String> obtenerAventureros() {
+        ArrayList<String> res = new ArrayList<>();
+        String sql = "SELECT idAventurero, NombreAventurero, ApellidoAventurero FROM Aventureros";
+        try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) res.add(rs.getInt(1) + " - " + rs.getString(2) + " " + rs.getString(3));
+        } catch (SQLException e) { }
+        return res;
+    }
 
-	    // 1. Leemos la primera fila de datos para deducir qué lista estamos viendo
-	    String joinedFirstRow = lines[firstDataIndex].toLowerCase();
-	    String title = "Reporte";
-	    java.util.List<String> headers = new ArrayList<>();
+    public ArrayList<String> obtenerActividades() {
+        ArrayList<String> res = new ArrayList<>();
+        String sql = "SELECT idActividad, NombreActividad FROM Actividades";
+        try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) res.add(rs.getInt(1) + " - " + rs.getString(2));
+        } catch (SQLException e) { }
+        return res;
+    }
 
-	    // 2. Asignamos el Título del PDF y las Cabeceras de las columnas según el contenido
-	    if (joinedFirstRow.contains("ave:") && joinedFirstRow.contains("act:")) {
-	        title = "Participaciones";
-	        headers = java.util.Arrays.asList("IDs", "Aventurero", "Actividad", "Hora");
-	    } else if (joinedFirstRow.contains("m:") || (joinedFirstRow.contains("h ") && joinedFirstRow.contains("€"))) {
-	        title = "Actividades";
-	        headers = java.util.Arrays.asList("ID", "Nombre", "Precio", "Duración", "Monitor");
-	    } else if (joinedFirstRow.contains("€")) {
-	        title = "Monitores";
-	        headers = java.util.Arrays.asList("ID", "Nombre", "Apellidos", "Email", "Salario");
-	    } else {
-	        title = "Aventureros";
-	        headers = java.util.Arrays.asList("ID", "Nombre", "Apellidos", "Email", "Teléfono");
-	    }
+    public ArrayList<String> obtenerParticipaciones() {
+        ArrayList<String> res = new ArrayList<>();
+        String sql = "SELECT p.idAventureroFK, p.idActividadFK, av.NombreAventurero, ac.NombreActividad FROM Participan p " +
+                "JOIN Aventureros av ON p.idAventureroFK = av.idAventurero JOIN Actividades ac ON p.idActividadFK = ac.idActividad";
+        try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) res.add(rs.getInt(1) + "-" + rs.getInt(2) + " | " + rs.getString(3) + " en " + rs.getString(4));
+        } catch (SQLException e) { }
+        return res;
+    }
+    
+    // --- EXPORTAR PDF REFACTORIZADO A CON COLUMNA DE FECHA EXTRA ---
+    public String exportToPDF(String[] lines) {
+        if (lines == null || lines.length == 0) return null;
 
-	    FileDialog fd = new FileDialog((Frame) null, "Guardar PDF", FileDialog.SAVE);
+        int firstDataIndex = 0;
+        while (firstDataIndex < lines.length && lines[firstDataIndex].trim().isEmpty()) {
+            firstDataIndex++;
+        }
+        if (firstDataIndex >= lines.length) return null;
 
-	    SimpleDateFormat sdf = new SimpleDateFormat("dd_MM_yyyy");
-	    String now = sdf.format(new java.util.Date());
+        String joinedFirstRow = lines[firstDataIndex].toLowerCase();
+        String title = "Reporte";
+        java.util.List<String> headers = new ArrayList<>();
 
-	    fd.setFile("consulta_" + title.replace(" ", "_") + "_" + now + ".pdf");
-	    fd.setVisible(true);
+        if (joinedFirstRow.contains("ave:") && joinedFirstRow.contains("act:")) {
+            title = "Participaciones";
+            headers = java.util.Arrays.asList("IDs", "Aventurero", "Actividad", "Hora", "Fecha Insc.");
+        } else if (joinedFirstRow.contains("m:") || (joinedFirstRow.contains("h ") && joinedFirstRow.contains("€"))) {
+            title = "Actividades";
+            headers = java.util.Arrays.asList("ID", "Nombre", "Precio", "Duración", "Monitor", "Fecha Act.");
+        } else if (joinedFirstRow.contains("€")) {
+            title = "Monitores";
+            headers = java.util.Arrays.asList("ID", "Nombre", "Apellidos", "Email", "Salario", "Fecha Ingreso");
+        } else {
+            title = "Aventureros";
+            headers = java.util.Arrays.asList("ID", "Nombre", "Apellidos", "Email", "Teléfono", "Fecha Nac.");
+        }
 
-	    String directory = fd.getDirectory();
-	    String filename = fd.getFile();
-	    if (directory == null || filename == null) {
-	        return false;
-	    }
+        FileDialog fd = new FileDialog((Frame) null, "Guardar PDF", FileDialog.SAVE);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd_MM_yyyy");
+        String now = sdf.format(new java.util.Date());
 
-	    String fullPath = directory + filename;
-	    if (!fullPath.toLowerCase().endsWith(".pdf")) {
-	        fullPath = fullPath + ".pdf";
-	    }
+        fd.setFile("consulta_" + title.replace(" ", "_") + "_" + now + ".pdf");
+        fd.setVisible(true);
 
-	    try (FileOutputStream fos = new FileOutputStream(fullPath);
-	         PdfWriter writer = new PdfWriter(fos);
-	         PdfDocument pdfDoc = new PdfDocument(writer);
-	         Document document = new Document(pdfDoc)) {
+        String directory = fd.getDirectory();
+        String filename = fd.getFile();
+        if (directory == null || filename == null) return null; 
 
-	        PdfFont font;
-	        try {
-	            font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
-	        } catch (Exception ex) {
-	            font = PdfFontFactory.createFont();
-	        }
-	        document.setFont(font);
+        String fullPath = directory + filename;
+        if (!fullPath.toLowerCase().endsWith(".pdf")) fullPath = fullPath + ".pdf";
 
-	        document.add(new Paragraph(title).setBold().setFontSize(16).setTextAlignment(TextAlignment.CENTER));
-	        document.add(new Paragraph(" "));
+        try (FileOutputStream fos = new FileOutputStream(fullPath);
+             PdfWriter writer = new PdfWriter(fos);
+             PdfDocument pdfDoc = new PdfDocument(writer);
+             Document document = new Document(pdfDoc)) {
 
-	        Table table = new Table(headers.size());
-	        table.setWidth(UnitValue.createPercentValue(100));
-	        for (String header : headers) {
-	            table.addHeaderCell(new Cell().add(new Paragraph(header).setBold()));
-	        }
+            PdfFont font;
+            try {
+                font = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+            } catch (Exception ex) {
+                font = PdfFontFactory.createFont();
+            }
+            document.setFont(font);
+            document.add(new Paragraph(title).setBold().setFontSize(16).setTextAlignment(TextAlignment.CENTER));
+            document.add(new Paragraph(" "));
 
-	        // 3. ATENCIÓN: Empezamos desde 'firstDataIndex' (NO +1) para no perder la primera fila de datos
-	        for (int row = firstDataIndex; row < lines.length; row++) {
-	            String line = lines[row].trim();
-	            if (line.isEmpty()) {
-	                continue;
-	            }
+            Table table = new Table(headers.size());
+            table.setWidth(UnitValue.createPercentValue(100));
+            for (String header : headers) {
+                table.addHeaderCell(new Cell().add(new Paragraph(header).setBold()));
+            }
 
-	            java.util.List<String> columns = new ArrayList<>();
-	            for (String part : lines[row].split("\\|")) {
-	                String value = part.trim();
-	                // 4. Limpiamos los prefijos visuales para que las celdas del PDF queden perfectas
-	                value = value.replace("Ave:", "").replace("Act:", "").replace("Hor:", "").replace("M:", "").trim();
-	                
-	                if (!value.isEmpty()) {
-	                    columns.add(value);
-	                }
-	            }
+            for (int row = firstDataIndex; row < lines.length; row++) {
+                String line = lines[row].trim();
+                if (line.isEmpty()) continue;
 
-	            for (int col = 0; col < headers.size(); col++) {
-	                String cellText = col < columns.size() ? columns.get(col) : "";
-	                table.addCell(new Cell().add(new Paragraph(cellText)));
-	            }
-	        }
+                java.util.List<String> columns = new ArrayList<>();
+                for (String part : lines[row].split("\\|")) {
+                    String value = part.trim();
+                    value = value.replace("Ave:", "").replace("Act:", "").replace("Hor:", "").replace("M:", "").trim();
+                    if (!value.isEmpty()) columns.add(value);
+                }
 
-	        document.add(table);
-	        
-	        // --- Mensaje de éxito en AWT puro ---
-	        java.awt.Dialog dialog = new java.awt.Dialog((java.awt.Frame) null, "Exportación Exitosa", true);
-	        dialog.setLayout(new java.awt.BorderLayout());
-	        
-	        java.awt.Panel panelCentro = new java.awt.Panel(new java.awt.GridLayout(2, 1));
-	        panelCentro.add(new java.awt.Label("El archivo PDF se ha guardado correctamente en:", java.awt.Label.CENTER));
-	        
-	        java.awt.TextField txtPath = new java.awt.TextField(fullPath);
-	        txtPath.setEditable(false);
-	        panelCentro.add(txtPath);
-	        
-	        dialog.add(panelCentro, java.awt.BorderLayout.CENTER);
-	        
-	        java.awt.Button okButton = new java.awt.Button("Aceptar");
-	        okButton.addActionListener(new java.awt.event.ActionListener() {
-	            public void actionPerformed(java.awt.event.ActionEvent e) {
-	                dialog.dispose();
-	            }
-	        });
-	        
-	        java.awt.Panel panelSur = new java.awt.Panel();
-	        panelSur.add(okButton);
-	        dialog.add(panelSur, java.awt.BorderLayout.SOUTH);
-	        
-	        dialog.setSize(450, 130);
-	        dialog.setLocationRelativeTo(null);
-	        dialog.setVisible(true);
-
-	        return true;
-	    } catch (IOException ex) {
-	        Logger.error("System","Error exportando a PDF: " + ex.getMessage());
-	        return false;
-	    } catch (Exception ex) {
-	        Logger.error("System","Error iText: " + ex.getMessage());
-	        return false;
-	    }
-	}	
+                for (int col = 0; col < headers.size(); col++) {
+                    String cellText = col < columns.size() ? columns.get(col) : "";
+                    table.addCell(new Cell().add(new Paragraph(cellText)));
+                }
+            }
+            document.add(table);
+            return fullPath; 
+            
+        } catch (IOException ex) {
+            Logger.error("System","Error exportando a PDF: " + ex.getMessage());
+            return null;
+        } catch (Exception ex) {
+            Logger.error("System","Error iText: " + ex.getMessage());
+            return null;
+        }
+    }   
 }
-
