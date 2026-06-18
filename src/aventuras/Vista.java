@@ -202,7 +202,7 @@ public class Vista {
         dlgFormMonitor.add(new Label("Apellidos:")); dlgFormMonitor.add(txtMonApellidos);
         dlgFormMonitor.add(new Label("Email:")); dlgFormMonitor.add(txtMonEmail);
         dlgFormMonitor.add(new Label("Salario (€):")); dlgFormMonitor.add(txtMonSalary);
-        dlgFormMonitor.add(new Label("Fecha Ingreso (dd/MM/yyyy):")); dlgFormMonitor.add(txtMonFechaIngreso); // NUEVO
+        dlgFormMonitor.add(new Label("Fecha Ingreso (dd/MM/yyyy):")); dlgFormMonitor.add(txtMonFechaIngreso);
         dlgFormMonitor.add(btnGuardarMonitor); 
 
         dlgFormAventurero.setLayout(new FlowLayout()); dlgFormAventurero.setSize(300, 360);
@@ -210,7 +210,7 @@ public class Vista {
         dlgFormAventurero.add(new Label("Apellidos:")); dlgFormAventurero.add(txtAveApellidos);
         dlgFormAventurero.add(new Label("Email:")); dlgFormAventurero.add(txtAveEmail);
         dlgFormAventurero.add(new Label("Teléfono:")); dlgFormAventurero.add(txtAveTelefono);
-        dlgFormAventurero.add(new Label("Fecha Nac. (dd/MM/yyyy):")); dlgFormAventurero.add(txtAveFechaNac); // NUEVO
+        dlgFormAventurero.add(new Label("Fecha Nac. (dd/MM/yyyy):")); dlgFormAventurero.add(txtAveFechaNac);
         dlgFormAventurero.add(btnGuardarAventurero); 
 
         dlgFormActividad.setLayout(new FlowLayout()); dlgFormActividad.setSize(300, 360);
@@ -218,14 +218,14 @@ public class Vista {
         dlgFormActividad.add(new Label("Precio (€):")); dlgFormActividad.add(txtActPrecio);
         dlgFormActividad.add(new Label("Duración (h):")); dlgFormActividad.add(txtActDuration); 
         dlgFormActividad.add(new Label("Monitor:")); dlgFormActividad.add(choMonitoresActDlg);
-        dlgFormActividad.add(new Label("Fecha Act. (dd/MM/yyyy):")); dlgFormActividad.add(txtActFechaAct); // NUEVO
+        dlgFormActividad.add(new Label("Fecha Act. (dd/MM/yyyy):")); dlgFormActividad.add(txtActFechaAct);
         dlgFormActividad.add(btnGuardarActividad); 
 
         dlgFormPart.setLayout(new FlowLayout()); dlgFormPart.setSize(350, 360);
         dlgFormPart.add(new Label("Aventurero:")); dlgFormPart.add(choAventurerosDlg);
         dlgFormPart.add(new Label("Actividad:")); dlgFormPart.add(choActividadesDlg);
         dlgFormPart.add(new Label("Hora (HH:MM):")); dlgFormPart.add(txtHoraDlg);
-        dlgFormPart.add(new Label("Fecha Insc. (dd/MM/yyyy):")); dlgFormPart.add(txtPartFechaInsc); // NUEVO
+        dlgFormPart.add(new Label("Fecha Insc. (dd/MM/yyyy):")); dlgFormPart.add(txtPartFechaInsc); 
         dlgFormPart.add(btnGuardarParticipacion);
 
         dlgSeleccion.setLayout(new FlowLayout()); dlgSeleccion.setSize(380, 160);
