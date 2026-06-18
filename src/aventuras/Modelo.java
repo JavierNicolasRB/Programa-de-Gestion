@@ -43,7 +43,7 @@ public class Modelo {
         try {
             return LocalDate.parse(fechaEuro.trim(), euroFormato).format(mysqlFormato);
         } catch (Exception e) {
-            return null; // Devuelve null si el usuario introduce un formato incorrecto
+            return null; 
         }
     }
 
@@ -73,7 +73,7 @@ public class Modelo {
     // --- CONSULTAS GENERALES CON FECHA ---
     public ArrayList<String> consultarMonitores() {
         ArrayList<String> lista = new ArrayList<>();
-        String sql = "SELECT idMonitor, NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, fecha_ingreso FROM Monitores";
+        String sql = "SELECT idMonitor, NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, FechaIngresoMonitor FROM Monitores";
         try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
                 String fechaEuro = deMySQLAEuro(rs.getString(6));
@@ -86,7 +86,7 @@ public class Modelo {
 
     public ArrayList<String> consultarAventureros() {
         ArrayList<String> lista = new ArrayList<>();
-        String sql = "SELECT idAventurero, NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, fecha_nacimiento FROM Aventureros";
+        String sql = "SELECT idAventurero, NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, FechaNacimientoAventurero FROM Aventureros";
         try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
                 String fechaEuro = deMySQLAEuro(rs.getString(6));
@@ -99,7 +99,7 @@ public class Modelo {
 
     public ArrayList<String> consultarActividades() {
         ArrayList<String> lista = new ArrayList<>();
-        String sql = "SELECT a.idActividad, a.NombreActividad, a.PrecioActividad, a.DuracionActividad, m.NombreMonitor, a.fecha_actividad " +
+        String sql = "SELECT a.idActividad, a.NombreActividad, a.PrecioActividad, a.DuracionActividad, m.NombreMonitor, a.FechaActividad " +
                 "FROM Actividades a LEFT JOIN Monitores m ON a.idMonitorFK = m.idMonitor";
         try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
@@ -113,7 +113,7 @@ public class Modelo {
 
     public ArrayList<String> consultarParticipaciones() {
         ArrayList<String> lista = new ArrayList<>();
-        String sql = "SELECT p.idAventureroFK, p.idActividadFK, av.NombreAventurero, ac.NombreActividad, p.HoraActividad, p.fecha_inscripcion " +
+        String sql = "SELECT p.idAventureroFK, p.idActividadFK, av.NombreAventurero, ac.NombreActividad, p.HoraActividad, p.FechaInscripcion " +
                 "FROM Participan p JOIN Aventureros av ON p.idAventureroFK = av.idAventurero " +
                 "JOIN Actividades ac ON p.idActividadFK = ac.idActividad";
         try (Connection con = getConexion(); Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
@@ -126,11 +126,11 @@ public class Modelo {
         return lista;
     }
 
-    // --- ALTAS CON PARSEO DE FECHA ---
     public boolean altaMonitor(String nom, String ape, String em, double sal, String fechaEuro) {
         String fechaMySQL = deEuroAMySQL(fechaEuro);
-        if (fechaMySQL == null) return false; // Error de formato de fecha
-        String sql = "INSERT INTO Monitores (NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, fecha_ingreso) VALUES (?, ?, ?, ?, ?)";
+        if (fechaMySQL == null) return false; 
+        // CORRECCIÓN APLICADA AQUÍ: 'cc' cambiado a 'FechaIngresoMonitor'
+        String sql = "INSERT INTO Monitores (NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, FechaIngresoMonitor) VALUES (?, ?, ?, ?, ?)";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setDouble(4, sal); ps.setString(5, fechaMySQL);
             return ps.executeUpdate() > 0;
@@ -140,7 +140,7 @@ public class Modelo {
     public boolean altaAventurero(String nom, String ape, String em, String tel, String fechaEuro) {
         String fechaMySQL = deEuroAMySQL(fechaEuro);
         if (fechaMySQL == null) return false;
-        String sql = "INSERT INTO Aventureros (NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, fecha_nacimiento) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO Aventureros (NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, FechaNacimientoAventurero) VALUES (?, ?, ?, ?, ?)";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setString(4, tel); ps.setString(5, fechaMySQL);
             return ps.executeUpdate() > 0;
@@ -150,7 +150,7 @@ public class Modelo {
     public boolean altaActividad(String nom, double pre, double dur, int idMon, String fechaEuro) {
         String fechaMySQL = deEuroAMySQL(fechaEuro);
         if (fechaMySQL == null) return false;
-        String sql = "INSERT INTO Actividades (NombreActividad, PrecioActividad, DuracionActividad, idMonitorFK, fecha_actividad) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO Actividades (NombreActividad, PrecioActividad, DuracionActividad, idMonitorFK, FechaActividad) VALUES (?, ?, ?, ?, ?)";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, nom); ps.setDouble(2, pre); ps.setDouble(3, dur); ps.setInt(4, idMon); ps.setString(5, fechaMySQL);
             return ps.executeUpdate() > 0;
@@ -160,7 +160,7 @@ public class Modelo {
     public boolean altaParticipacion(int idAve, int idAct, String hora, String fechaEuro) {
         String fechaMySQL = deEuroAMySQL(fechaEuro);
         if (fechaMySQL == null) return false;
-        String sql = "INSERT INTO Participan (idAventureroFK, idActividadFK, HoraActividad, fecha_inscripcion) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO Participan (idAventureroFK, idActividadFK, HoraActividad, FechaInscripcion) VALUES (?, ?, ?, ?)";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idAve); ps.setInt(2, idAct); ps.setString(3, hora); ps.setString(4, fechaMySQL);
             return ps.executeUpdate() > 0;
@@ -196,7 +196,7 @@ public class Modelo {
     public boolean modificarMonitor(int id, String nom, String ape, String em, double sal, String fechaEuro) {
         String fechaMySQL = deEuroAMySQL(fechaEuro);
         if (fechaMySQL == null) return false;
-        String sql = "UPDATE Monitores SET NombreMonitor = ?, ApellidoMonitor = ?, EmailMonitor = ?, SalarioMonitor = ?, fecha_ingreso = ? WHERE idMonitor = ?";
+        String sql = "UPDATE Monitores SET NombreMonitor = ?, ApellidoMonitor = ?, EmailMonitor = ?, SalarioMonitor = ?, FechaIngresoMonitor = ? WHERE idMonitor = ?";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setDouble(4, sal); ps.setString(5, fechaMySQL); ps.setInt(6, id);
             return ps.executeUpdate() > 0;
@@ -206,7 +206,7 @@ public class Modelo {
     public boolean modificarAventurero(int id, String nom, String ape, String em, String tel, String fechaEuro) {
         String fechaMySQL = deEuroAMySQL(fechaEuro);
         if (fechaMySQL == null) return false;
-        String sql = "UPDATE Aventureros SET NombreAventurero = ?, ApellidoAventurero = ?, EmailAventurero = ?, TelefonoAventurero = ?, fecha_nacimiento = ? WHERE idAventurero = ?";
+        String sql = "UPDATE Aventureros SET NombreAventurero = ?, ApellidoAventurero = ?, EmailAventurero = ?, TelefonoAventurero = ?, FechaNacimientoAventurero = ? WHERE idAventurero = ?";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, nom); ps.setString(2, ape); ps.setString(3, em); ps.setString(4, tel); ps.setString(5, fechaMySQL); ps.setInt(6, id);
             return ps.executeUpdate() > 0;
@@ -216,7 +216,7 @@ public class Modelo {
     public boolean modificarActividad(int id, String nom, double pre, double dur, int idMon, String fechaEuro) {
         String fechaMySQL = deEuroAMySQL(fechaEuro);
         if (fechaMySQL == null) return false;
-        String sql = "UPDATE Actividades SET NombreActividad = ?, PrecioActividad = ?, DuracionActividad = ?, idMonitorFK = ?, fecha_actividad = ? WHERE idActividad = ?";
+        String sql = "UPDATE Actividades SET NombreActividad = ?, PrecioActividad = ?, DuracionActividad = ?, idMonitorFK = ?, FechaActividad = ? WHERE idActividad = ?";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, nom); ps.setDouble(2, pre); ps.setDouble(3, dur); ps.setInt(4, idMon); ps.setString(5, fechaMySQL); ps.setInt(6, id);
             return ps.executeUpdate() > 0;
@@ -228,9 +228,9 @@ public class Modelo {
         return false;
     }
 
-    // --- BÚSQUEDAS UNITARIAS (Devuelven la fecha ya convertida a Euro) ---
+    // --- BÚSQUEDAS UNITARIAS (CORREGIDAS) ---
     public String[] buscarMonitorPorId(int id) {
-        String sql = "SELECT NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, fecha_ingreso FROM Monitores WHERE idMonitor = ?";
+        String sql = "SELECT NombreMonitor, ApellidoMonitor, EmailMonitor, SalarioMonitor, FechaIngresoMonitor FROM Monitores WHERE idMonitor = ?";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
@@ -241,7 +241,7 @@ public class Modelo {
     }
 
     public String[] buscarAventureroPorId(int id) {
-        String sql = "SELECT NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, fecha_nacimiento FROM Aventureros WHERE idAventurero = ?";
+        String sql = "SELECT NombreAventurero, ApellidoAventurero, EmailAventurero, TelefonoAventurero, FechaNacimientoAventurero FROM Aventureros WHERE idAventurero = ?";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
@@ -252,7 +252,7 @@ public class Modelo {
     }
 
     public String[] buscarActividadPorId(int id) {
-        String sql = "SELECT NombreActividad, PrecioActividad, DuracionActividad, idMonitorFK, fecha_actividad FROM Actividades WHERE idActividad = ?";
+        String sql = "SELECT NombreActividad, PrecioActividad, DuracionActividad, idMonitorFK, FechaActividad FROM Actividades WHERE idActividad = ?";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
@@ -263,7 +263,7 @@ public class Modelo {
     }
 
     public String buscarHoraYFechaParticipacion(int idAve, int idAct) {
-        String sql = "SELECT HoraActividad, fecha_inscripcion FROM Participan WHERE idAventureroFK = ? AND idActividadFK = ?";
+        String sql = "SELECT HoraActividad, FechaInscripcion FROM Participan WHERE idAventureroFK = ? AND idActividadFK = ?";
         try (Connection con = getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idAve); ps.setInt(2, idAct);
             try (ResultSet rs = ps.executeQuery()) { 
